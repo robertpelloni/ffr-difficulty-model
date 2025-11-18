@@ -1,38 +1,54 @@
 import os
 import dotenv
 import pickle
-
-import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
+import ast
 
 if __name__ == '__main__':
-
     project_dir = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
     dotenv_path = os.path.join(project_dir, '.env')
     dotenv.load_dotenv(dotenv_path)
-    
-    raw_data_folder = os.getenv("RAW_DATA_FOLDER")
-    processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER")
-    models_folder = os.getenv("MODELS_FOLDER")
-    output_data_folder = os.getenv("OUTPUT_DATA_FOLDER")
 
-    df = pd.read_csv('/'.join([processed_data_folder, 'dataset.csv']), index_col='id')
-    y_true = df.pop('difficulty')
-    regr = pickle.load(open( '/'.join([models_folder, 'random_forest_regressor.p']), "rb" ))
+    processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER", "data/processed")
+    models_folder = os.getenv("MODELS_FOLDER", "models")
+    output_data_folder = os.getenv("OUTPUT_DATA_FOLDER", "data/output")
+    os.makedirs(output_data_folder, exist_ok=True)
 
-    results = pd.DataFrame(index=df.index)
-    names = np.array([])
+    # Load the dataset
+    df = pd.read_csv(os.path.join(processed_data_folder, 'dataset.csv'), index_col='id')
 
-    for i, row in results.iterrows():
-        raw_data_path = '/'.join([raw_data_folder, str(i).zfill(4) + '.chart'])
-        raw_data = pickle.load(open(raw_data_path, "rb"))
-        names = np.append(names, np.array(raw_data['name']))
-    
-    results['name'] = names
-    results['actual_diff'] = y_true
-    results['pred_diff'] = regr.predict(df)
+    # Preprocess the data just like in the training script
+    df['vertical'] = df['vertical'].apply(ast.literal_eval)
+    df['horizontal'] = df['horizontal'].apply(ast.literal_eval)
 
-    os.makedirs(output_data_folder, exist_ok=True)  
-    results.to_csv('/'.join([output_data_folder, 'results.csv']), index=False)
+    df_features = pd.concat([df.drop(['vertical', 'horizontal', 'difficulty'], axis=1),
+                             df['vertical'].apply(pd.Series),
+                             df['horizontal'].apply(pd.Series)], axis=1)
+
+    # Map difficulty strings to numerical values
+    difficulty_mapping = {
+        'Beginner': 1, 'Easy': 2, 'Medium': 3, 'Hard': 4, 'Challenge': 5, 'Edit': 0
+    }
+    df['difficulty'] = df['difficulty'].map(difficulty_mapping)
+    y_true = df['difficulty']
+
+    # Ensure all feature columns are numeric
+    df_features = df_features.select_dtypes(include=['number'])
+
+    # Load the trained model
+    with open(os.path.join(models_folder, 'random_forest_regressor.p'), "rb") as f:
+        regr = pickle.load(f)
+
+    # Generate predictions
+    predictions = regr.predict(df_features)
+
+    # Create a results DataFrame
+    results = pd.DataFrame({
+        'actual_difficulty': y_true,
+        'predicted_difficulty': predictions
+    }, index=df.index)
+
+    # Save the results
+    results.to_csv(os.path.join(output_data_folder, 'predictions.csv'))
+
+    print("Predictions saved to data/output/predictions.csv")
