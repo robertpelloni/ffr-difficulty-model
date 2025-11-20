@@ -24,7 +24,6 @@ def main(input_filepath, output_filepath):
                 serializer.download(chart_data, chart_id)
                 chart_id += 1
             processed_files += 1
-            print(f"Processed {sm_file.title} ({processed_files}/{len(simfiles)})")
         except Exception as e:
             print(f"Error processing {sm_file.title}: {e}", file=sys.stderr)
 
