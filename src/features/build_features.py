@@ -3,8 +3,8 @@ import os
 import pickle
 import csv
 
-from src.features.HorizontalDensity import HorizontalDensity
-from src.features.VerticalDensity import VerticalDensity
+from HorizontalDensity import HorizontalDensity
+from VerticalDensity import VerticalDensity
 
 if __name__ == '__main__':
 

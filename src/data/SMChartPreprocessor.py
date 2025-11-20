@@ -1,7 +1,9 @@
+import sys
 import numpy as np
 import simfile
 from simfile.timing import TimingData
-from simfile.notes import NoteData
+from simfile.timing.engine import TimingEngine
+from simfile.notes import NoteData, NoteType
 
 class SMChartPreprocessor:
     """
@@ -33,6 +35,7 @@ class SMChartPreprocessor:
         """
         preprocessed_charts = []
         timing_data = TimingData(sm_file)
+        timing_engine = TimingEngine(timing_data)
 
         for chart in sm_file.charts:
             # We are only considering single player dance charts for now
@@ -43,8 +46,8 @@ class SMChartPreprocessor:
             timed_notes = []
             for note in note_data:
                 # Only consider tap notes for now
-                if note.note_type == 'Tap':
-                    time = timing_data.time_at(note.beat)
+                if note.note_type == NoteType.TAP:
+                    time = timing_engine.time_at(note.beat)
                     encoding = self._encode_note(note.column)
                     if encoding != 0:
                         timed_notes.append((time, encoding))
@@ -63,10 +66,14 @@ class SMChartPreprocessor:
                 difficulty_map = {'1': 'Beginner', '2': 'Easy', '3': 'Medium', '4': 'Hard', '5': 'Challenge'}
                 difficulty = difficulty_map.get(difficulty, 'Unknown')
 
+            meter = 0
+            if chart.meter and chart.meter.isdigit():
+                meter = int(chart.meter)
+
             preprocessed_charts.append({
                 'name': sm_file.title,
                 'difficulty': difficulty,
-                'meter': int(chart.meter),
+                'meter': meter,
                 'chart': chart_dict,
             })
 
@@ -84,35 +91,3 @@ class SMChartPreprocessor:
             3: 1,    # Right
         }
         return note_map.get(column, 0)
-
-if __name__ == '__main__':
-    # Example Usage:
-    # This part is for testing and demonstration.
-    # It requires a sample .sm file.
-
-    # Create a dummy sm file for testing
-    sm_content = """
-#TITLE:Test Song;
-#ARTIST:Test Artist;
-#BPMS:0=120;
-#NOTES:
-     dance-single:
-     Beginner:
-     1:
-     :
-1000
-0100
-0010
-0001
-;
-"""
-    with open("test.sm", "w") as f:
-        f.write(sm_content)
-
-    sm = simfile.open("test.sm")
-    preprocessor = SMChartPreprocessor()
-    processed_data = preprocessor.preprocess(sm)
-    print(processed_data)
-
-    import os
-    os.remove("test.sm")

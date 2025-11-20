@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-import dotenv
+import sys
 from sm_data_loader import load_sm_files_from_directory
 from SMChartPreprocessor import SMChartPreprocessor
 from DataSerializer import DataSerializer
@@ -16,21 +16,26 @@ def main(input_filepath, output_filepath):
     serializer = DataSerializer(folder=output_filepath)
 
     chart_id = 0
+    processed_files = 0
     for sm_file in simfiles:
-        preprocessed_charts = preprocessor.preprocess(sm_file)
-        for chart_data in preprocessed_charts:
-            serializer.download(chart_data, chart_id)
-            chart_id += 1
+        try:
+            preprocessed_charts = preprocessor.preprocess(sm_file)
+            for chart_data in preprocessed_charts:
+                serializer.download(chart_data, chart_id)
+                chart_id += 1
+            processed_files += 1
+            print(f"Processed {sm_file.title} ({processed_files}/{len(simfiles)})")
+        except Exception as e:
+            print(f"Error processing {sm_file.title}: {e}", file=sys.stderr)
 
-    print(f"Processed and serialized {chart_id} charts.")
+    print(f"Processed and serialized {chart_id} charts from {processed_files} files.")
 
 if __name__ == '__main__':
-    project_dir = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
-    dotenv_path = os.path.join(project_dir, '.env')
-    dotenv.load_dotenv(dotenv_path)
+    import argparse
 
-    # For now, we'll use the .env variables if they exist, otherwise, default to data/raw and data/processed
-    raw_data_folder = os.getenv("RAW_DATA_FOLDER", "data/raw")
-    processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER", "data/processed")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_folder', type=str, help='Input folder containing .sm files')
+    parser.add_argument('output_folder', type=str, help='Output folder for .chart files')
+    args = parser.parse_args()
 
-    main(raw_data_folder, processed_data_folder)
+    main(args.input_folder, args.output_folder)

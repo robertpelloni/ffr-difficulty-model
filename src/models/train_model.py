@@ -19,9 +19,17 @@ if __name__ == '__main__':
 
     df = pd.read_csv(os.path.join(processed_data_folder, 'dataset.csv'), index_col='id')
 
+    def safe_literal_eval(x):
+        if isinstance(x, str):
+            try:
+                return ast.literal_eval(x)
+            except (ValueError, SyntaxError):
+                return x
+        return x
+
     # Convert string representations of dictionaries into actual dictionaries
-    df['vertical'] = df['vertical'].apply(ast.literal_eval)
-    df['horizontal'] = df['horizontal'].apply(ast.literal_eval)
+    df['vertical'] = df['vertical'].apply(safe_literal_eval)
+    df['horizontal'] = df['horizontal'].apply(safe_literal_eval)
 
     # Flatten the dictionary columns
     df = pd.concat([df.drop(['vertical', 'horizontal'], axis=1),

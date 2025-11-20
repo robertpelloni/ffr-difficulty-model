@@ -17,9 +17,17 @@ if __name__ == '__main__':
     # Load the dataset
     df = pd.read_csv(os.path.join(processed_data_folder, 'dataset.csv'), index_col='id')
 
+    def safe_literal_eval(x):
+        if isinstance(x, str):
+            try:
+                return ast.literal_eval(x)
+            except (ValueError, SyntaxError):
+                return x
+        return x
+
     # Preprocess the data just like in the training script
-    df['vertical'] = df['vertical'].apply(ast.literal_eval)
-    df['horizontal'] = df['horizontal'].apply(ast.literal_eval)
+    df['vertical'] = df['vertical'].apply(safe_literal_eval)
+    df['horizontal'] = df['horizontal'].apply(safe_literal_eval)
 
     df_features = pd.concat([df.drop(['vertical', 'horizontal', 'difficulty'], axis=1),
                              df['vertical'].apply(pd.Series),
