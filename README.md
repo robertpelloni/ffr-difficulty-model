@@ -55,3 +55,23 @@ Project Organization
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+
+## Predicting Difficulty
+
+To predict the difficulty of a StepMania (.sm) file, follow these steps:
+
+1.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2.  **Run the prediction script:**
+    ```bash
+    python predict_difficulty.py /path/to/your/file.sm
+    ```
+    The script will output a single floating-point number representing the predicted difficulty of the chart.
+
+You can also specify a custom model file using the `--model-path` argument:
+```bash
+python predict_difficulty.py /path/to/your/file.sm --model-path /path/to/your/model.p
+```
