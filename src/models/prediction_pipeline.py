@@ -52,10 +52,8 @@ class DifficultyPredictor:
                 'length': horizontal_features.get('length'),
             }
 
-            # NOTE: Vertical features are temporarily removed due to a mismatch
-            # between training and prediction feature sets.
-            # vertical_features = self.vertical_density.compute(chart)
-            # features.update(vertical_features)
+            vertical_features = self.vertical_density.compute(chart)
+            features.update(vertical_features)
 
             features.update(horizontal_features)
 
