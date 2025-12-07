@@ -1,6 +1,6 @@
 import argparse
 import os
-from src.models.prediction_pipeline import predict_difficulty
+from src.models.prediction_pipeline import DifficultyPredictor
 
 def main():
     parser = argparse.ArgumentParser(description="Predict the difficulty of a StepMania (.sm) file.")
@@ -17,8 +17,16 @@ def main():
         return
 
     try:
-        difficulty = predict_difficulty(args.sm_path, args.model_path)
-        print(difficulty)
+        predictor = DifficultyPredictor(args.model_path)
+        predictions = predictor.predict(args.sm_path)
+
+        if not predictions:
+            print("No valid charts found in the .sm file.")
+            return
+
+        for p in predictions:
+            print(f"Difficulty: {p['difficulty']}, Meter: {p['meter']}, Predicted Difficulty: {p['predicted_difficulty']:.2f}")
+
     except Exception as e:
         print(f"An error occurred: {e}")
 
