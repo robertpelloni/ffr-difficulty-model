@@ -4,38 +4,10 @@ import pickle
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-import re
 
 def load_and_preprocess_data(data_path):
     """Loads and preprocesses the dataset from a CSV file."""
     df = pd.read_csv(data_path, index_col='id')
-
-    def extract_features_from_string(x):
-        if not isinstance(x, str):
-            return {}
-
-        # A robust regex to find all floating point numbers in the string
-        numbers = [float(n) for n in re.findall(r"[-+]?\\d*\\.\\d+|\\d+", x)]
-
-        if len(numbers) == 7: # vertical
-            return {'L': numbers[0], 'D': numbers[1], 'U': numbers[2], 'R': numbers[3],
-                    'left': numbers[4], 'right': numbers[5], 'all': numbers[6]}
-        elif len(numbers) == 2: # horizontal
-            return {'nps': numbers[0], 'length': numbers[1]}
-        return {}
-
-    # Apply the function to the 'vertical' and 'horizontal' columns
-    vertical_df = df['vertical'].apply(extract_features_from_string).apply(pd.Series)
-    horizontal_df = df['horizontal'].apply(extract_features_from_string).apply(pd.Series)
-
-    # Concatenate the new columns, avoiding duplicates from the original df
-    df = pd.concat([df.drop(['vertical', 'horizontal'], axis=1),
-                   vertical_df,
-                   horizontal_df], axis=1)
-
-    # Remove duplicate columns, keeping the last one (from the dictionaries)
-    df = df.loc[:,~df.columns.duplicated(keep='last')]
-
     return df
 
 def train_model(df, models_folder):
@@ -54,11 +26,6 @@ def train_model(df, models_folder):
     feature_cols = [
         'meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all'
     ]
-
-    # Ensure all feature columns are present, filling missing ones with 0
-    for col in feature_cols:
-        if col not in df.columns:
-            df[col] = 0
 
     X = df[feature_cols].copy()
     for col in X.columns:
