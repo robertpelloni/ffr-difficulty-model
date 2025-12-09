@@ -6,9 +6,11 @@ with open('requirements.txt') as f:
 setup(
     name='stepmania-difficulty-predictor',
     packages=find_packages(),
-    version='0.2.0',
+    version='0.3.0',
     description='A library to predict the difficulty of StepMania (.sm) files.',
     author='Wilson Cheung',
     license='MIT',
-    install_requires=required
+    install_requires=required,
+    package_data={'stepmania_difficulty_predictor': ['model/random_forest_regressor.p']},
+    include_package_data=True,
 )
