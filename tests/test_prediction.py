@@ -44,5 +44,31 @@ class TestDifficultyPredictor(unittest.TestCase):
         self.assertIsInstance(predictions, list)
         self.assertGreater(len(predictions), 0)
 
+    def test_predict_batch(self):
+        """
+        Tests that the DifficultyPredictor can successfully predict the difficulty
+        of a batch of .sm files.
+        """
+        batch_predictions = self.predictor.predict_batch([self.sm_path, self.sm_path])
+        self.assertIsInstance(batch_predictions, list)
+        self.assertEqual(len(batch_predictions), 2)
+
+        for predictions in batch_predictions:
+            self.assertIsInstance(predictions, list)
+            self.assertGreater(len(predictions), 0)
+
+    def test_include_features(self):
+        """
+        Tests that the DifficultyPredictor can successfully include the feature
+        vector in the prediction output.
+        """
+        predictions = self.predictor.predict(self.sm_path, include_features=True)
+        self.assertIsInstance(predictions, list)
+        self.assertGreater(len(predictions), 0)
+
+        for p in predictions:
+            self.assertIn('features', p)
+            self.assertIsInstance(p['features'], dict)
+
 if __name__ == '__main__':
     unittest.main()

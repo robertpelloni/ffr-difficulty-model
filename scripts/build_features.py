@@ -2,16 +2,22 @@ import dotenv
 import os
 import pickle
 import csv
-from HorizontalDensity import HorizontalDensity
-from VerticalDensity import VerticalDensity
+import sys
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from stepmania_difficulty_predictor.features.HorizontalDensity import HorizontalDensity
+from stepmania_difficulty_predictor.features.VerticalDensity import VerticalDensity
 
 if __name__ == '__main__':
-    project_dir = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
+    project_dir = os.path.join(os.path.dirname(__file__), os.pardir)
     dotenv_path = os.path.join(project_dir, '.env')
     dotenv.load_dotenv(dotenv_path)
 
     processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER", "data/processed")
-    os.makedirs(processed_data_folder, exist_ok=True)
+    os.makedirs(processed_data_folder, exist_ok = True)
 
     vertical_density = VerticalDensity(alpha=3)
     horizontal_density = HorizontalDensity(alpha=3)

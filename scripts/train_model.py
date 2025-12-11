@@ -4,6 +4,12 @@ import pickle
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+import re
+import sys
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
 def load_and_preprocess_data(data_path):
     """Loads and preprocesses the dataset from a CSV file."""
@@ -27,6 +33,11 @@ def train_model(df, models_folder):
         'meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all'
     ]
 
+    # Ensure all feature columns are present, filling missing ones with 0
+    for col in feature_cols:
+        if col not in df.columns:
+            df[col] = 0
+
     X = df[feature_cols].copy()
     for col in X.columns:
         X[col] = pd.to_numeric(X[col], errors='coerce')
@@ -44,12 +55,12 @@ def train_model(df, models_folder):
         pickle.dump(regr, f)
 
 if __name__ == '__main__':
-    project_dir = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)
+    project_dir = os.path.join(os.path.dirname(__file__), os.pardir)
     dotenv_path = os.path.join(project_dir, '.env')
     dotenv.load_dotenv(dotenv_path)
 
     processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER", "data/processed")
-    models_folder = os.getenv("MODELS_FOLDER", "models")
+    models_folder = "stepmania_difficulty_predictor/model"
     os.makedirs(models_folder, exist_ok=True)
 
     dataset_path = os.path.join(processed_data_folder, 'dataset.csv')

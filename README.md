@@ -38,18 +38,18 @@ import simfile
 # predictor = DifficultyPredictor("path/to/your/model.p")
 predictor = DifficultyPredictor()
 
-# Predict the difficulty of a .sm file from a path
-predictions_from_path = predictor.predict("path/to/your/file.sm")
+# Predict the difficulty of a single .sm file
+predictions = predictor.predict("path/to/your/file.sm", include_features=True)
 
-for p in predictions_from_path:
+for p in predictions:
     print(f"Difficulty: {p['difficulty']}, Meter: {p['meter']}, Predicted Difficulty: {p['predicted_difficulty']:.2f}")
+    print(f"Features: {p['features']}")
 
-# You can also predict the difficulty of a simfile object
-with open("path/to/your/file.sm", "r") as f:
-    sm = simfile.open(f)
-    predictions_from_object = predictor.predict(sm)
+# You can also predict the difficulty of a batch of .sm files
+batch_predictions = predictor.predict_batch(["path/to/your/file.sm", "path/to/another/file.sm"])
 
-    for p in predictions_from_object:
+for file_predictions in batch_predictions:
+    for p in file_predictions:
         print(f"Difficulty: {p['difficulty']}, Meter: {p['meter']}, Predicted Difficulty: {p['predicted_difficulty']:.2f}")
 ```
 

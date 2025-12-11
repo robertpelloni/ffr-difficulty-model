@@ -4,7 +4,7 @@ import simfile
 from stepmania_difficulty_predictor.data.SMChartPreprocessor import SMChartPreprocessor
 from stepmania_difficulty_predictor.features.HorizontalDensity import HorizontalDensity
 from stepmania_difficulty_predictor.features.VerticalDensity import VerticalDensity
-from typing import Union
+from typing import Union, List
 import os
 
 # Get the path to the packaged model
@@ -36,7 +36,7 @@ class DifficultyPredictor:
         self.horizontal_density = HorizontalDensity(alpha=3)
         self.vertical_density = VerticalDensity(alpha=3)
 
-    def predict(self, sm: Union[str, simfile.Simfile]) -> list:
+    def predict(self, sm: Union[str, simfile.Simfile], include_features: bool = False) -> list:
         """
         Predicts the difficulty of all charts in a .sm file or simfile object.
 
@@ -45,53 +45,87 @@ class DifficultyPredictor:
 
         Args:
             sm: The path to the .sm file or a `simfile` object.
+            include_features: If True, the raw feature vector will be included
+                              in the output.
 
         Returns:
             A list of dictionaries, where each dictionary contains the chart's
             original difficulty, its meter, and the predicted difficulty.
+            If `include_features` is True, the dictionary will also contain a
+            'features' key with the raw feature vector.
             Returns an empty list if no valid charts are found.
         """
-        if isinstance(sm, str):
-            sm_file = simfile.open(sm)
-        else:
-            sm_file = sm
+        return self.predict_batch([sm], include_features=include_features)[0]
 
-        preprocessed_charts = self.preprocessor.preprocess(sm_file)
+    def predict_batch(self, sms: List[Union[str, simfile.Simfile]], include_features: bool = False) -> List[list]:
+        """
+        Predicts the difficulty of all charts in a batch of .sm files or simfile objects.
 
-        if not preprocessed_charts:
-            return []
+        This method takes a list of paths to .sm files or a list of `simfile` objects
+        and returns a list of prediction lists for each valid file.
 
-        predictions = []
-        for chart_data in preprocessed_charts:
-            chart = chart_data.pop('chart')
+        Args:
+            sms: A list of paths to .sm files or a list of `simfile` objects.
+            include_features: If True, the raw feature vector will be included
+                              in the output.
 
-            horizontal_features = self.horizontal_density.compute(chart)
-            vertical_features = self.vertical_density.compute(chart)
+        Returns:
+            A list of lists of dictionaries, where each inner list contains the predictions
+            for a single file. Each dictionary contains the chart's original difficulty,
+            its meter, and the predicted difficulty. If `include_features` is True,
+            the dictionary will also contain a 'features' key with the raw feature vector.
+        """
+        batch_predictions = []
+        for sm in sms:
+            if isinstance(sm, str):
+                sm_file = simfile.open(sm)
+            else:
+                sm_file = sm
 
-            features = {
-                'meter': chart_data.get('meter'),
-                'nps': horizontal_features.get('nps'),
-                'length': horizontal_features.get('length'),
-                **vertical_features,
-                **horizontal_features
-            }
+            preprocessed_charts = self.preprocessor.preprocess(sm_file)
 
-            df_features = pd.DataFrame([features])
-            df_features = df_features.select_dtypes(include=['number'])
+            if not preprocessed_charts:
+                batch_predictions.append([])
+                continue
 
-            # Ensure the order of columns matches the training order
-            training_cols = ['meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all']
-            df_features = df_features.reindex(columns=training_cols, fill_value=0)
+            chart_predictions = []
+            for chart_data in preprocessed_charts:
+                chart = chart_data.pop('chart')
 
-            prediction = self.model.predict(df_features)[0]
+                horizontal_features = self.horizontal_density.compute(chart)
+                vertical_features = self.vertical_density.compute(chart)
 
-            predictions.append({
-                'difficulty': chart_data.get('difficulty'),
-                'meter': chart_data.get('meter'),
-                'predicted_difficulty': prediction
-            })
+                features = {
+                    'meter': chart_data.get('meter'),
+                    'nps': horizontal_features.get('nps'),
+                    'length': horizontal_features.get('length'),
+                    **vertical_features,
+                    **horizontal_features
+                }
 
-        return predictions
+                df_features = pd.DataFrame([features])
+                df_features = df_features.select_dtypes(include=['number'])
+
+                # Ensure the order of columns matches the training order
+                training_cols = ['meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all']
+                df_features = df_features.reindex(columns=training_cols, fill_value=0)
+
+                prediction = self.model.predict(df_features)[0]
+
+                result = {
+                    'difficulty': chart_data.get('difficulty'),
+                    'meter': chart_data.get('meter'),
+                    'predicted_difficulty': prediction
+                }
+
+                if include_features:
+                    result['features'] = df_features.to_dict('records')[0]
+
+                chart_predictions.append(result)
+
+            batch_predictions.append(chart_predictions)
+
+        return batch_predictions
 
 def predict_difficulty(sm_path: str, model_path: str = DEFAULT_MODEL_PATH) -> float:
     """
