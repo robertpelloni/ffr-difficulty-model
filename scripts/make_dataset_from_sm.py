@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-from sm_data_loader import load_sm_files_from_directory
-from SMChartPreprocessor import SMChartPreprocessor
-from DataSerializer import DataSerializer
+import argparse
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from stepmania_difficulty_predictor.data.sm_data_loader import load_sm_files_from_directory
+from stepmania_difficulty_predictor.data.SMChartPreprocessor import SMChartPreprocessor
+from stepmania_difficulty_predictor.DataSerializer import DataSerializer
 
 def main(input_filepath, output_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into
@@ -30,8 +36,6 @@ def main(input_filepath, output_filepath):
     print(f"Processed and serialized {chart_id} charts from {processed_files} files.")
 
 if __name__ == '__main__':
-    import argparse
-
     parser = argparse.ArgumentParser()
     parser.add_argument('input_folder', type=str, help='Input folder containing .sm files')
     parser.add_argument('output_folder', type=str, help='Output folder for .chart files')
