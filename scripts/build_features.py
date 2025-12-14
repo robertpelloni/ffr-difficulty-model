@@ -10,6 +10,8 @@ sys.path.insert(0, project_root)
 
 from stepmania_difficulty_predictor.features.HorizontalDensity import HorizontalDensity
 from stepmania_difficulty_predictor.features.VerticalDensity import VerticalDensity
+from stepmania_difficulty_predictor.features.StreamDetector import StreamDetector
+from stepmania_difficulty_predictor.features.PatternDetector import PatternDetector
 
 if __name__ == '__main__':
     project_dir = os.path.join(os.path.dirname(__file__), os.pardir)
@@ -21,11 +23,15 @@ if __name__ == '__main__':
 
     vertical_density = VerticalDensity(alpha=3)
     horizontal_density = HorizontalDensity(alpha=3)
+    stream_detector = StreamDetector()
+    pattern_detector = PatternDetector()
 
     # Define the full, flattened feature set for the CSV header
     fields = [
         'id', 'difficulty', 'meter', 'nps', 'length',
-        'L', 'D', 'U', 'R', 'left', 'right', 'all'
+        'L', 'D', 'U', 'R', 'left', 'right', 'all',
+        'stream_percentage', 'max_stream_length',
+        'jack_percentage', 'crossover_percentage'
     ]
 
     with open(os.path.join(processed_data_folder, 'dataset.csv'), 'w', newline='') as f:
@@ -43,16 +49,20 @@ if __name__ == '__main__':
                 # Compute features
                 horizontal_features = horizontal_density.compute(chart)
                 vertical_features = vertical_density.compute(chart)
+                stream_features = stream_detector.compute(chart)
+                pattern_features = pattern_detector.compute(chart)
 
                 # Create a single row with all features flattened
                 row = {
                     'id': int(filename.split('.')[0]),
                     'difficulty': raw_data.get('difficulty'),
                     'meter': raw_data.get('meter'),
-                    'nps': horizontal_features.get('nps'),
-                    'length': horizontal_features.get('length'),
+                    **horizontal_features,
                     **vertical_features,
-                    **horizontal_features
+                    **stream_features,
+                    **pattern_features
+                    'nps': horizontal_features.get('nps'),
+                    'length': horizontal_features.get('length')
                 }
 
                 # Ensure only the defined fields are written to the CSV

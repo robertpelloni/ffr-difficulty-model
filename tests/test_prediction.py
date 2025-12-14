@@ -1,12 +1,14 @@
 import unittest
 import os
 import simfile
-from stepmania_difficulty_predictor.models.prediction_pipeline import DifficultyPredictor
+from stepmania_difficulty_predictor.models.prediction_pipeline import DifficultyPredictor, predict_difficulty
 
 class TestDifficultyPredictor(unittest.TestCase):
 
     def setUp(self):
         self.sm_path = "test.sm"
+        self.no_dance_single_path = "tests/no_dance_single.sm"
+        self.empty_chart_path = "tests/empty_chart.sm"
         self.predictor = DifficultyPredictor()
 
     def test_predict_from_path(self):
@@ -69,6 +71,29 @@ class TestDifficultyPredictor(unittest.TestCase):
         for p in predictions:
             self.assertIn('features', p)
             self.assertIsInstance(p['features'], dict)
+
+    def test_no_dance_single(self):
+        """
+        Tests that the DifficultyPredictor handles .sm files with no dance-single
+        charts gracefully.
+        """
+        predictions = self.predictor.predict(self.no_dance_single_path)
+        self.assertEqual(predictions, [])
+
+    def test_empty_chart(self):
+        """
+        Tests that the DifficultyPredictor handles charts with no notes gracefully.
+        """
+        predictions = self.predictor.predict(self.empty_chart_path)
+        self.assertEqual(predictions, [])
+
+    def test_deprecated_function(self):
+        """
+        Tests that the deprecated predict_difficulty function still raises a
+        ValueError for invalid inputs to maintain backward compatibility.
+        """
+        with self.assertRaises(ValueError):
+            predict_difficulty(self.no_dance_single_path)
 
 if __name__ == '__main__':
     unittest.main()

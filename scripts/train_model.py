@@ -30,7 +30,8 @@ def get_features_and_labels(df):
 
     # Define feature columns explicitly to ensure they are all included
     feature_cols = [
-        'meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all'
+        'meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all',
+        'stream_percentage', 'max_stream_length', 'jack_percentage', 'crossover_percentage'
     ]
 
     # Ensure all feature columns are present, filling missing ones with 0

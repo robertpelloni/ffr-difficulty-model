@@ -34,23 +34,28 @@ class SMChartPreprocessor:
         Processes each chart in a simfile.
         """
         preprocessed_charts = []
+        if not hasattr(sm_file, 'charts') or not sm_file.charts:
+            return preprocessed_charts
+
         timing_data = TimingData(sm_file)
         timing_engine = TimingEngine(timing_data)
 
         for chart in sm_file.charts:
-            # We are only considering single player dance charts for now
-            if chart.stepstype != 'dance-single':
+            if not chart or chart.stepstype != 'dance-single':
                 continue
 
             note_data = NoteData(chart)
             timed_notes = []
             for note in note_data:
-                # Only consider tap notes for now
                 if note.note_type == NoteType.TAP:
-                    time = timing_engine.time_at(note.beat)
-                    encoding = self._encode_note(note.column)
-                    if encoding != 0:
-                        timed_notes.append((time, encoding))
+                    try:
+                        time = timing_engine.time_at(note.beat)
+                        encoding = self._encode_note(note.column)
+                        if encoding != 0:
+                            timed_notes.append((time, encoding))
+                    except (ValueError, KeyError):
+                        # Skip notes with invalid columns
+                        continue
 
             if not timed_notes:
                 continue
@@ -61,17 +66,18 @@ class SMChartPreprocessor:
                 for time, encoding in timed_notes
             }
 
-            difficulty = chart.difficulty
+            difficulty = getattr(chart, 'difficulty', 'Unknown')
             if difficulty.isdigit():
                 difficulty_map = {'1': 'Beginner', '2': 'Easy', '3': 'Medium', '4': 'Hard', '5': 'Challenge'}
                 difficulty = difficulty_map.get(difficulty, 'Unknown')
 
             meter = 0
-            if chart.meter and chart.meter.isdigit():
-                meter = int(chart.meter)
+            meter_str = getattr(chart, 'meter', '0')
+            if meter_str and meter_str.isdigit():
+                meter = int(meter_str)
 
             preprocessed_charts.append({
-                'name': sm_file.title,
+                'name': getattr(sm_file, 'title', 'Unknown'),
                 'difficulty': difficulty,
                 'meter': meter,
                 'chart': chart_dict,

@@ -4,6 +4,8 @@ import simfile
 from stepmania_difficulty_predictor.data.SMChartPreprocessor import SMChartPreprocessor
 from stepmania_difficulty_predictor.features.HorizontalDensity import HorizontalDensity
 from stepmania_difficulty_predictor.features.VerticalDensity import VerticalDensity
+from stepmania_difficulty_predictor.features.StreamDetector import StreamDetector
+from stepmania_difficulty_predictor.features.PatternDetector import PatternDetector
 from typing import Union, List
 import os
 
@@ -35,6 +37,8 @@ class DifficultyPredictor:
         self.preprocessor = SMChartPreprocessor()
         self.horizontal_density = HorizontalDensity(alpha=3)
         self.vertical_density = VerticalDensity(alpha=3)
+        self.stream_detector = StreamDetector()
+        self.pattern_detector = PatternDetector()
 
     def predict(self, sm: Union[str, simfile.Simfile], include_features: bool = False) -> list:
         """
@@ -77,10 +81,14 @@ class DifficultyPredictor:
         """
         batch_predictions = []
         for sm in sms:
-            if isinstance(sm, str):
-                sm_file = simfile.open(sm)
-            else:
-                sm_file = sm
+            try:
+                if isinstance(sm, str):
+                        sm_file = simfile.open(sm, strict=False)
+                else:
+                    sm_file = sm
+            except ValueError:
+                batch_predictions.append([])
+                continue
 
             preprocessed_charts = self.preprocessor.preprocess(sm_file)
 
@@ -94,20 +102,29 @@ class DifficultyPredictor:
 
                 horizontal_features = self.horizontal_density.compute(chart)
                 vertical_features = self.vertical_density.compute(chart)
+                stream_features = self.stream_detector.compute(chart)
+                pattern_features = self.pattern_detector.compute(chart)
 
                 features = {
                     'meter': chart_data.get('meter'),
-                    'nps': horizontal_features.get('nps'),
-                    'length': horizontal_features.get('length'),
+                    **horizontal_features,
                     **vertical_features,
-                    **horizontal_features
+                    **stream_features,
+                    **pattern_features
+
+                    'nps': horizontal_features.get('nps'),
+                    'length': horizontal_features.get('length')
+ 
                 }
 
                 df_features = pd.DataFrame([features])
                 df_features = df_features.select_dtypes(include=['number'])
 
                 # Ensure the order of columns matches the training order
-                training_cols = ['meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all']
+                training_cols = [
+                    'meter', 'nps', 'length', 'L', 'D', 'U', 'R', 'left', 'right', 'all',
+                    'stream_percentage', 'max_stream_length', 'jack_percentage', 'crossover_percentage'
+                ]
                 df_features = df_features.reindex(columns=training_cols, fill_value=0)
 
                 prediction = self.model.predict(df_features)[0]
