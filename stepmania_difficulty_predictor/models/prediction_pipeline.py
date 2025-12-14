@@ -81,10 +81,14 @@ class DifficultyPredictor:
         """
         batch_predictions = []
         for sm in sms:
-            if isinstance(sm, str):
-                sm_file = simfile.open(sm)
-            else:
-                sm_file = sm
+            try:
+                if isinstance(sm, str):
+                        sm_file = simfile.open(sm, strict=False)
+                else:
+                    sm_file = sm
+            except ValueError:
+                batch_predictions.append([])
+                continue
 
             preprocessed_charts = self.preprocessor.preprocess(sm_file)
 
