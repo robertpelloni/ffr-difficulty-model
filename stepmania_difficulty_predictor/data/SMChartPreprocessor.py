@@ -20,14 +20,6 @@ class SMChartPreprocessor:
 
     def __init__(self, decimals=3):
         self.decimals = decimals
-        self.mappings = {
-            '1': 1000,  # Left
-            '2': 100,   # Down
-            '3': 10,    # Up
-            '4': 1,     # Right
-            'M': 1000,  # Mine (maps to Left for now)
-            # Other note types like holds, rolls, etc., are ignored for now
-        }
 
     def preprocess(self, sm_file: simfile.Simfile):
         """
@@ -41,29 +33,41 @@ class SMChartPreprocessor:
         timing_engine = TimingEngine(timing_data)
 
         for chart in sm_file.charts:
-            if not chart or chart.stepstype != 'dance-single':
+            if not chart or not chart.stepstype:
                 continue
 
             note_data = NoteData(chart)
-            timed_notes = []
+
+            # Group notes by timestamp
+            notes_by_time = {}
             for note in note_data:
                 if note.note_type == NoteType.TAP:
                     try:
                         time = timing_engine.time_at(note.beat)
-                        encoding = self._encode_note(note.column)
-                        if encoding != 0:
-                            timed_notes.append((time, encoding))
+                        time = np.round(time, self.decimals)
+                        if time not in notes_by_time:
+                            notes_by_time[time] = []
+                        notes_by_time[time].append(note.column)
                     except (ValueError, KeyError):
-                        # Skip notes with invalid columns
                         continue
 
-            if not timed_notes:
+            if not notes_by_time:
                 continue
 
-            # Create the chart dictionary
+            # Determine the number of panels
+            if hasattr(chart, 'columns') and chart.columns:
+                num_panels = len(chart.columns)
+            else:
+                # Fallback for older simfile versions or malformed charts
+                mode_panels = {'dance-single': 4, 'dance-double': 8, 'pump-single': 5, 'pump-double': 10}
+                num_panels = mode_panels.get(chart.stepstype, 0)
+
+            if num_panels == 0:
+                continue
+
             chart_dict = {
-                np.round(time, self.decimals): str(encoding).zfill(4)
-                for time, encoding in timed_notes
+                time: self._encode_row(columns, num_panels)
+                for time, columns in notes_by_time.items()
             }
 
             difficulty = getattr(chart, 'difficulty', 'Unknown')
@@ -78,6 +82,7 @@ class SMChartPreprocessor:
 
             preprocessed_charts.append({
                 'name': getattr(sm_file, 'title', 'Unknown'),
+                'mode': chart.stepstype,
                 'difficulty': difficulty,
                 'meter': meter,
                 'chart': chart_dict,
@@ -85,15 +90,12 @@ class SMChartPreprocessor:
 
         return preprocessed_charts
 
-    def _encode_note(self, column: int) -> int:
+    def _encode_row(self, columns: list[int], num_panels: int) -> str:
         """
-        Encodes a note column into an integer representation.
+        Encodes a list of active columns for a given row/timestamp into a binary string.
         """
-        # Based on 4-key dance single
-        note_map = {
-            0: 1000, # Left
-            1: 100,  # Down
-            2: 10,   # Up
-            3: 1,    # Right
-        }
-        return note_map.get(column, 0)
+        encoding = ['0'] * num_panels
+        for col in columns:
+            if 0 <= col < num_panels:
+                encoding[col] = '1'
+        return "".join(encoding)

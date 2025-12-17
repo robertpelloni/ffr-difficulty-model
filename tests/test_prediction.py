@@ -1,99 +1,113 @@
 import unittest
 import os
 import simfile
-from stepmania_difficulty_predictor.models.prediction_pipeline import DifficultyPredictor, predict_difficulty
+import pickle
+from stepmania_difficulty_predictor.models.prediction_pipeline import ModeAgnosticDifficultyPredictor
 
-class TestDifficultyPredictor(unittest.TestCase):
+class MockModel:
+    """A mock model for testing purposes."""
+    def __init__(self, prediction_value=1.0):
+        self.prediction_value = prediction_value
+        self.feature_names_in_ = ['nps', 'length', 'col_0', 'col_1', 'col_2', 'col_3',
+                                  'left', 'right', 'all', 'stream_percentage',
+                                  'max_stream_length', 'jack_percentage', 'crossover_percentage']
+
+    def predict(self, features):
+        return [self.prediction_value]
+
+class TestModeAgnosticDifficultyPredictor(unittest.TestCase):
 
     def setUp(self):
+        self.model_dir = "stepmania_difficulty_predictor/model"
+        os.makedirs(self.model_dir, exist_ok=True)
+
+        # Create valid, empty pickle files for the dummy models
+        with open(os.path.join(self.model_dir, "dance-single.p"), "wb") as f:
+            pickle.dump(MockModel(), f)
+        with open(os.path.join(self.model_dir, "dance-double.p"), "wb") as f:
+            pickle.dump(MockModel(), f)
+
         self.sm_path = "test.sm"
-        self.no_dance_single_path = "tests/no_dance_single.sm"
+        self.dance_double_path = "tests/dance_double.sm"
         self.empty_chart_path = "tests/empty_chart.sm"
-        self.predictor = DifficultyPredictor()
+        self.predictor = ModeAgnosticDifficultyPredictor(model_dir=self.model_dir)
 
     def test_predict_from_path(self):
         """
-        Tests that the DifficultyPredictor can successfully predict the difficulty
-        of a .sm file from a path and that the prediction is a float.
+        Tests that the predictor can successfully predict the difficulty of a .sm file.
         """
+        self.predictor.models['dance-single'] = MockModel(prediction_value=1.0)
+
         predictions = self.predictor.predict(self.sm_path)
         self.assertIsInstance(predictions, list)
         self.assertGreater(len(predictions), 0)
 
         for p in predictions:
-            self.assertIsInstance(p['predicted_difficulty'], float)
+            self.assertEqual(p['mode'], 'dance-single')
+            self.assertEqual(p['predicted_difficulty'], 1.0)
 
     def test_predict_from_object(self):
         """
-        Tests that the DifficultyPredictor can successfully predict the difficulty
-        of a simfile object and that the prediction is a float.
+        Tests that the predictor can successfully predict from a simfile object.
         """
+        self.predictor.models['dance-single'] = MockModel(prediction_value=2.0)
+
         with open(self.sm_path, "r") as f:
             sm = simfile.load(f)
             predictions = self.predictor.predict(sm)
             self.assertIsInstance(predictions, list)
             self.assertGreater(len(predictions), 0)
-
-            for p in predictions:
-                self.assertIsInstance(p['predicted_difficulty'], float)
-
-    def test_custom_model_loading(self):
-        """
-        Tests that the DifficultyPredictor can successfully load a custom model.
-        """
-        custom_predictor = DifficultyPredictor(model_path="stepmania_difficulty_predictor/model/random_forest_regressor.p")
-        predictions = custom_predictor.predict(self.sm_path)
-        self.assertIsInstance(predictions, list)
-        self.assertGreater(len(predictions), 0)
+            self.assertEqual(predictions[0]['predicted_difficulty'], 2.0)
 
     def test_predict_batch(self):
         """
-        Tests that the DifficultyPredictor can successfully predict the difficulty
-        of a batch of .sm files.
+        Tests batch prediction functionality.
         """
+        self.predictor.models['dance-single'] = MockModel(prediction_value=3.0)
+
         batch_predictions = self.predictor.predict_batch([self.sm_path, self.sm_path])
         self.assertIsInstance(batch_predictions, list)
         self.assertEqual(len(batch_predictions), 2)
-
-        for predictions in batch_predictions:
-            self.assertIsInstance(predictions, list)
-            self.assertGreater(len(predictions), 0)
+        self.assertEqual(batch_predictions[0][0]['predicted_difficulty'], 3.0)
 
     def test_include_features(self):
         """
-        Tests that the DifficultyPredictor can successfully include the feature
-        vector in the prediction output.
+        Tests that the feature vector is correctly included in the output.
         """
+        self.predictor.models['dance-single'] = MockModel()
+
         predictions = self.predictor.predict(self.sm_path, include_features=True)
-        self.assertIsInstance(predictions, list)
         self.assertGreater(len(predictions), 0)
+        self.assertIn('features', predictions[0])
+        self.assertIsInstance(predictions[0]['features'], dict)
 
-        for p in predictions:
-            self.assertIn('features', p)
-            self.assertIsInstance(p['features'], dict)
+    def test_handles_other_modes(self):
+        """
+        Tests that the predictor correctly processes a file with a different mode.
+        """
+        self.predictor.models['dance-double'] = MockModel(prediction_value=4.0)
 
-    def test_no_dance_single(self):
-        """
-        Tests that the DifficultyPredictor handles .sm files with no dance-single
-        charts gracefully.
-        """
-        predictions = self.predictor.predict(self.no_dance_single_path)
-        self.assertEqual(predictions, [])
+        predictions = self.predictor.predict(self.dance_double_path)
+        self.assertGreater(len(predictions), 0)
+        self.assertEqual(predictions[0]['mode'], 'dance-double')
+        self.assertEqual(predictions[0]['predicted_difficulty'], 4.0)
 
     def test_empty_chart(self):
         """
-        Tests that the DifficultyPredictor handles charts with no notes gracefully.
+        Tests graceful handling of charts with no notes.
         """
         predictions = self.predictor.predict(self.empty_chart_path)
         self.assertEqual(predictions, [])
 
-    def test_deprecated_function(self):
+    def test_no_model_for_mode(self):
         """
-        Tests that the deprecated predict_difficulty function still raises a
-        ValueError for invalid inputs to maintain backward compatibility.
+        Tests that charts are skipped when no corresponding model is loaded.
         """
-        with self.assertRaises(ValueError):
-            predict_difficulty(self.no_dance_single_path)
+        if 'dance-single' in self.predictor.models:
+            del self.predictor.models['dance-single']
+
+        predictions = self.predictor.predict(self.sm_path)
+        self.assertEqual(predictions, [])
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,70 +1,80 @@
-import dotenv
 import os
-import pickle
-import csv
+import json
+import pandas as pd
+from tqdm import tqdm
 import sys
+import argparse
 
 # Add the project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stepmania_difficulty_predictor.features.HorizontalDensity import HorizontalDensity
 from stepmania_difficulty_predictor.features.VerticalDensity import VerticalDensity
 from stepmania_difficulty_predictor.features.StreamDetector import StreamDetector
 from stepmania_difficulty_predictor.features.PatternDetector import PatternDetector
 
-if __name__ == '__main__':
-    project_dir = os.path.join(os.path.dirname(__file__), os.pardir)
-    dotenv_path = os.path.join(project_dir, '.env')
-    dotenv.load_dotenv(dotenv_path)
+def build_features(processed_dir, output_path):
+    """
+    Builds a feature set from the processed chart files and saves it to a CSV.
+    """
+    chart_files = [os.path.join(processed_dir, f) for f in os.listdir(processed_dir) if f.endswith('.chart')]
 
-    processed_data_folder = os.getenv("PROCESSED_DATA_FOLDER", "data/processed")
-    os.makedirs(processed_data_folder, exist_ok = True)
+    if not chart_files:
+        print(f"No .chart files found in {processed_dir}. Did you run make_dataset_from_sm.py first?")
+        return
 
-    vertical_density = VerticalDensity(alpha=3)
+    # Initialize feature extractors
     horizontal_density = HorizontalDensity(alpha=3)
+    vertical_density = VerticalDensity(alpha=3)
     stream_detector = StreamDetector()
     pattern_detector = PatternDetector()
 
-    # Define the full, flattened feature set for the CSV header
-    fields = [
-        'id', 'difficulty', 'meter', 'nps', 'length',
-        'L', 'D', 'U', 'R', 'left', 'right', 'all',
-        'stream_percentage', 'max_stream_length',
-        'jack_percentage', 'crossover_percentage'
-    ]
+    all_features = []
 
-    with open(os.path.join(processed_data_folder, 'dataset.csv'), 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
+    print("Building features from processed chart files...")
+    for chart_file in tqdm(chart_files):
+        try:
+            with open(chart_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            print(f"Skipping corrupt chart file: {chart_file} ({e})")
+            continue
 
-        for filename in os.listdir(processed_data_folder):
-            if filename.endswith(".chart"):
-                filepath = os.path.join(processed_data_folder, filename)
-                with open(filepath, "rb") as chart_file:
-                    raw_data = pickle.load(chart_file)
+        chart = data.get('chart', {})
+        if chart:
+            chart = {float(k): v for k, v in chart.items()}
 
-                chart = raw_data.pop('chart')
+        mode = data.get('mode', 'unknown')
+        meter = data.get('meter', 0)
 
-                # Compute features
-                horizontal_features = horizontal_density.compute(chart)
-                vertical_features = vertical_density.compute(chart)
-                stream_features = stream_detector.compute(chart)
-                pattern_features = pattern_detector.compute(chart)
+        if not chart:
+            continue
 
-                # Create a single row with all features flattened
-                row = {
-                    'id': int(filename.split('.')[0]),
-                    'difficulty': raw_data.get('difficulty'),
-                    'meter': raw_data.get('meter'),
-                    **horizontal_features,
-                    **vertical_features,
-                    **stream_features,
-                    **pattern_features
-                    'nps': horizontal_features.get('nps'),
-                    'length': horizontal_features.get('length')
-                }
+        # Compute features using the mode-agnostic extractors
+        h_density_features = horizontal_density.compute(chart)
+        v_density_features = vertical_density.compute(chart)
+        stream_features = stream_detector.compute(chart)
+        pattern_features = pattern_detector.compute(chart)
 
-                # Ensure only the defined fields are written to the CSV
-                filtered_row = {key: row[key] for key in fields if key in row}
-                writer.writerow(filtered_row)
+        # Combine all features into a single dictionary
+        features = {
+            'meter': meter,
+            'mode': mode,
+            **h_density_features,
+            **v_density_features,
+            **stream_features,
+            **pattern_features
+        }
+        all_features.append(features)
+
+    # Create a DataFrame and save to CSV
+    df = pd.DataFrame(all_features)
+    df.to_csv(output_path, index=False)
+    print(f"Successfully built feature dataset with {len(df)} charts at {output_path}")
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Build features from processed chart files.")
+    parser.add_argument("processed_dir", type=str, help="Directory containing the processed .chart files.")
+    parser.add_argument("output_path", type=str, help="Path to save the output dataset.csv file.")
+    args = parser.parse_args()
+    build_features(args.processed_dir, args.output_path)
