@@ -15,7 +15,8 @@ def train_model(dataset_path, model_dir):
 
     # Clean the data
     df = df.replace([np.inf, -np.inf], np.nan)
-    df = df.dropna()
+    # Remove global dropna to avoid dropping modes with fewer features
+    # df = df.dropna()
 
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
@@ -24,12 +25,22 @@ def train_model(dataset_path, model_dir):
     for mode, group in df.groupby('mode'):
         print(f"--- Training model for mode: {mode} ---")
 
+        # Drop columns that are entirely NaN for this mode
+        group = group.dropna(axis=1, how='all')
+        # Then drop rows with any remaining NaN
+        group = group.dropna()
+
         if len(group) < 10:
             print(f"Skipping mode '{mode}': not enough data (found {len(group)} samples).")
             continue
 
         X = group.drop(columns=['meter', 'mode'])
         y = group['meter']
+
+        # Determine the maximum meter in this mode to use for normalization if needed
+        # But we'll keep the raw meter for now and just ensure it's a float
+        # The user specifically requested a floating point difficulty scale
+        y = y.astype(float)
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
