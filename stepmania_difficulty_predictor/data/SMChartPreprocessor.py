@@ -75,10 +75,13 @@ class SMChartPreprocessor:
                 difficulty_map = {'1': 'Beginner', '2': 'Easy', '3': 'Medium', '4': 'Hard', '5': 'Challenge'}
                 difficulty = difficulty_map.get(difficulty, 'Unknown')
 
-            meter = 0
+            meter = 0.0
             meter_str = getattr(chart, 'meter', '0')
-            if meter_str and meter_str.isdigit():
-                meter = int(meter_str)
+            if meter_str:
+                try:
+                    meter = float(meter_str)
+                except ValueError:
+                    meter = 0.0
 
             preprocessed_charts.append({
                 'name': getattr(sm_file, 'title', 'Unknown'),
